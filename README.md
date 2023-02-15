@@ -1,2 +1,3 @@
 # JustPaste.py
-A simple Python library for JustPaste.it API
+### A simple Python library for JustPaste.it API
+
