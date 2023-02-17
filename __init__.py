@@ -1,1 +1,1 @@
-from .main import Justpaste
+from .main import *

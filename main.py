@@ -124,7 +124,7 @@ For now only creating new notes trigger captcha.
         if r['status'] == "success":
             return True
         else:
-            pass
+            raise Exception("Could not delete the note. Did you log in with the right account?")
 
     def _edit_note(self,_id,_sc,*args,**kwargs):
         note_properties = {"articleId":_id,"secureCode":_sc}
@@ -137,7 +137,7 @@ For now only creating new notes trigger captcha.
             if r2["success"] == True:
                 return True
             else:
-                pass
+                raise Exception("Could not edit the note. Did you log in with the right account?")
         else:
             print(r2)
 
