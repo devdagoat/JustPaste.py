@@ -5,7 +5,7 @@ Creating notes with non-premium JustPaste accounts are problematic due to the we
 
  **The captcha is ONLY triggered when creating notes!!!**
 
-There is not much we can do about this situation.
+*There is not much we can do about this situation.*
 
 ## Installation
 ### *For Windows*:
@@ -14,11 +14,30 @@ There is not much we can do about this situation.
 ```pip3 install -U justpaste.py```
 
 ## Usage
+
     from justpaste import Justpaste
 
-    j = Justpaste("email address","password")
+    j = Justpaste("email_address","password")
     print(j.new_note(title="Test",body="Demonstration,password="12345"))
-### *Output*:
-    https://justpaste.it/XXXXX
 
-    
+### *Output*:
+    https://justpaste.it/c5j3o
+
+## Methods
+
+### Creating a new note:
+    j.new_note(title="Test",body="Demonstration,password="12345")
+
+    >> https://justpaste.it/c5j3o
+
+### Editing a note:
+    j.edit_note("https://justpaste.it/c5j3o",title="Edited Title",body="Something that replaces the old text",password="12345")
+
+    >> True
+
+**Note:** The new parameters will *overwrite* the old note altogether, please pass the existing parameters if you wish to keep them unchanged.
+
+### Deleting a note:
+    j.delete_note(https://justpaste.it/c5j3o)
+
+    >> True

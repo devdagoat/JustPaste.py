@@ -69,7 +69,22 @@ For now only creating new notes trigger captcha.
                 continue
         return id,secure_code
 
-    def _construct_body(self,_id,_sc,title:str,body:str,privacy=None,path="",password=None,anon_owner=False,hide_views=False,require_captcha=False,shared_users:list=[],tags:list=[],description="",expire_date:int=None,viewonce=False):
+    def _construct_body(self,
+    _id,
+    _sc,
+    title:str,
+    body:str,
+    privacy=None,
+    path="",
+    password=None,
+    anon_owner=False,
+    hide_views=False,
+    require_captcha=False,
+    shared_users:list=[],
+    tags:list=[],
+    description="",
+    expire_date:int=None,
+    viewonce=False):
         if not privacy:
             if self.logged:
                 privacy = "hidden"
@@ -189,7 +204,7 @@ For now only creating new notes trigger captcha.
         article_id,secure_code = self._get_attrs(url)
         return self._delete_note(_id=article_id,_sc=secure_code,*args,**kwargs)
 
-    def _logout(self):
+    def _logout(self): # idk why this exists but hey 
         r = self.s.post("https://justpaste.it/logout").json()
         if r["success"] == True:
             return self.s
