@@ -47,7 +47,7 @@ Creating notes with non-premium JustPaste accounts are problematic due to the we
 
     >> example@example.com
 
-### Fetching all notes*:
+### Fetching all notes**:
     j.fetch_notes()
 
     >> list({title*:url})
@@ -56,7 +56,7 @@ Creating notes with non-premium JustPaste accounts are problematic due to the we
 
     >> list(dict(...))
 
-### Finding a note by title*:
+### Finding a note by title**:
     j.find_by_title("string")
 
     >> list({title*:url})
