@@ -25,13 +25,11 @@ For now only creating new notes trigger captcha.
         if self.s:
             if type(self.s) == requests.Session:
                 self.logged = True
-            else:
-                print(self.s)
+            elif type(self.s) == tuple:
+                print(self.s[1])
                 print("Continuing anonymously.")
+                self.s = self.s[0]
                 self.logged = False
-        else:
-            print("Something else happened while logging in, continuing anonymously.")
-            self.logged = False
 
     def _login(self):
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36 OPR/94.0.0.0",
@@ -42,18 +40,18 @@ For now only creating new notes trigger captcha.
         #print(f)
         if "password" in f:
             if f["password"] == "invalidPassword":
-                return "Invalid password."
+                return r,"Invalid password."
             elif f["password"] == "wrongLengthMin":
-                return "Password is too short."
+                return r,"Password is too short."
             elif f["email"] == "userNotFound":
-                return "User not found."
+                return r,"User not found."
             else:
-                pass
+                return r,"Unknown Error"
         if "success" in f:
             if f["success"]:
                 return r
         else:
-            pass
+            return r,"Unknown Error"
         
     def _get_attrs(self,url:str):
         r = self.s.get(url)
