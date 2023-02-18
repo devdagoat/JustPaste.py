@@ -30,14 +30,35 @@ Creating notes with non-premium JustPaste accounts are problematic due to the we
 
     >> https://justpaste.it/c5j3o
 
-### Editing a note:
+### Editing a note*:
     j.edit_note("https://justpaste.it/c5j3o",title="Edited Title",body="Something that replaces the old text",password="12345")
 
     >> True
 
-**Note:** The new parameters will *overwrite* the old note altogether, please pass the existing parameters if you wish to keep them unchanged.
+*__Note:__ The new parameters will *overwrite* the old note altogether, please pass the existing parameters if you wish to keep them unchanged.
 
 ### Deleting a note:
     j.delete_note(https://justpaste.it/c5j3o)
 
     >> True
+
+### Getting account info:
+    j.fetch_info("userEmail")
+
+    >> example@example.com
+
+### Fetching all notes*:
+    j.fetch_notes()
+
+    >> list({title*:url})
+
+    j.fetch_notes(verbose=True)
+
+    >> list(dict(...))
+
+### Finding a note by title*:
+    j.find_by_title("string")
+
+    >> list({title*:url})
+
+**__Note:__ If a note has no title, its first ~60 characters of body is returned as title instead. (The reason is the API returns it as title.)

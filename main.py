@@ -1,5 +1,6 @@
 import requests
 import re
+import json
 from bs4 import BeautifulSoup
 
 
@@ -36,7 +37,8 @@ For now only creating new notes trigger captcha.
                 "Sec-Ch-Ua": '"Chromium";v="108", "Opera";v="94", "Not)A;Brand";v="99"'}
         payl = {"email":self.email,"password":self.password,"rememberMe":True}
         r = requests.Session()
-        f = r.post("https://justpaste.it/api/v1/login",headers=headers,json=payl).json()
+        r.headers.update(headers)
+        f = r.post("https://justpaste.it/api/v1/login",json=payl).json()
         #print(f)
         if "password" in f:
             if f["password"] == "invalidPassword":
@@ -154,12 +156,103 @@ For now only creating new notes trigger captcha.
         else:
             print(r2)
 
+    def _fetch_info(self,info:str=None):
+        resp = self.s.get("https://justpaste.it/")
+        soup = BeautifulSoup(resp.content,"html.parser")
+        raw_info = re.search("window.mainPanelOptions = (.*);",str(soup.find_all("script")[0])).group(1)
+        dict_info = json.loads(raw_info)
+        if info:
+            value = str(dict_info[info])
+            if value.startswith("/"):
+                if info == "userAvatar":
+                    if value.endswith("/20") or value.endswith("/40"):
+                        return "https://justpaste.it" + value + "0"
+                    else: 
+                        return "https://justpaste.it" + value
+                else:
+                    return "https://justpaste.it" + value
+            else:
+                return value
+        else:
+            return dict_info
+
+    def _get_json_element(self,reg,index:int,page_suffix=''):
+        manage_page = f"https://justpaste.it/account/manage/{page_suffix}"
+        resp = self.s.get(manage_page)
+        soup = BeautifulSoup(resp.content,"html.parser")
+        scripts = soup.find_all("script")
+        script = str(scripts[index])
+        result = re.search(reg,script).group(1)
+        return json.loads(result)
+
+    def _fetch_notes(self):
+        note_data = re.compile(r"window\.articlesData = (.*);")
+        page_num_data = re.compile(r"window\.pagination = (.*);")
+        try:
+            notes_list = []
+            max_pages = self._get_json_element(page_num_data,5)["totalPages"]
+            for i in range(max_pages):
+                notes = self._get_json_element(note_data,5,str(i+1))
+                for note in notes:
+                    notes_list.append(note)
+            return notes_list
+        except IndexError:
+            print("Couldn't load notes")
+
+    def _find_by_title(self,string:str):
+        res = []
+        for note in self._fetch_notes():
+            if string in note["title"]:
+                res.append({note["title"]:note["url"]})
+        return res
+
+    def find_by_title(self,string:str):
+        """Searches for the specified string in note titles and returns them in {title*:link} format.
+        ### Parameters:
+            - string (str): The string that is searched for.
+
+        *if a note does not have a title, first ~60 characters of the body are searched instead"""
+        
+        return self._find_by_title(string)
+
+    def fetch_notes(self,verbose = False):
+        """Returns the notes that aren't in the trash in the format of {title*:link} format.**
+        ### Parameters:
+            - verbose (bool): If set to True, everything (Article ID, Secure code, creation date etc.) about the note is returned instead. Default=False
+
+        *If a link does not have a title, first ~60 characters of the body is passed instead. (This is a result of the website API.)"""
+
+        if verbose:
+            return self._fetch_notes()
+        else:
+            notes_list = []
+            for note in self._fetch_notes():
+                notes_list.append({note["title"]:note["url"]})
+            return notes_list
+
+    def fetch_info(self,info:str):
+        """Fetches information about the account that is used.
+        ### Parameters:
+        - info: The information that is to be fetched.
+        #### Values: 
+        - 'userEmail': Returns user email
+        - 'userPermalink': Returns username
+        - 'userAvatar': Returns avatar URL
+        - 'userProfileIsPublic': Returns if the profile is public
+        - 'userProfileLink': Returns user profile"""
+
+        if not self.logged:
+            raise Exception("An account is not used to return its properties.")
+        else:
+            return self._fetch_info(info)
+
+
     def new_note(self,*args,**kwargs):
 
         """Creates a new JustPaste.it page (note).
         ### Parameters:
             - title (str): Title of the note.
-            - body (str): Content of the note.
+            - body (str): Content of the note in HTML.
             - description (str): Description of the note. (deprecated in the website but still accessible by the API) Default=""
             - privacy ("public","hidden","private"): Visibility level of the note. Default="hidden" if logged, else "public"
             - password (str): Password of the note. Default=None
@@ -179,7 +272,7 @@ For now only creating new notes trigger captcha.
         ### Parameters:
             - url (str): URL of the page.
             - title (str): Title of the note.
-            - body (str): Content of the note.
+            - body (str): Content of the note in HTML.
             - description (str): Description of the note. (deprecated in the website but still accessible by the API) Default=""
             - privacy ("public","hidden","private"): Visibility level of the note. Default="hidden" if logged, else "public"
             - password (str): Password of the note. Default=None
