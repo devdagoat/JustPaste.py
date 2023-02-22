@@ -2,6 +2,7 @@ import requests
 import re
 import json
 from bs4 import BeautifulSoup
+from .settings import Settings
 
 
 class Justpaste:
@@ -83,7 +84,7 @@ For now only creating new notes trigger captcha.
     shared_users:list=[],
     tags:list=[],
     description="",
-    expire_date:int=None,
+    expire_date:str=None,
     viewonce=False):
         if not privacy:
             if self.logged:
@@ -176,9 +177,11 @@ For now only creating new notes trigger captcha.
         else:
             return dict_info
 
-    def _get_json_element(self,reg,index:int,page_suffix=''):
+    def _get_json_element(self,reg,index:int,page=None,page_suffix=''):
         manage_page = f"https://justpaste.it/account/manage/{page_suffix}"
-        resp = self.s.get(manage_page)
+        if not page:
+            page = manage_page
+        resp = self.s.get(page)
         soup = BeautifulSoup(resp.content,"html.parser")
         scripts = soup.find_all("script")
         script = str(scripts[index])
@@ -205,7 +208,29 @@ For now only creating new notes trigger captcha.
             if string in note["title"]:
                 res.append({note["title"]:note["url"]})
         return res
+        
+    def _apply_settings(self,settings:Settings):
+        result = dict()
+        for url in settings.total_req:
+            if url == "https://justpaste.it/account/settings/public-profile/save":
+                self.s.headers.update(settings.profile_headers)
+                resp = self.s.post(url,files=settings.files_req)
+            else:
+                self.s.headers.update({"Content-Type": "application/json"})
+                resp = self.s.post(url,json=settings.total_req[url])
+                if url == "https://justpaste.it/account/settings/change-password/save" and "success" in resp.json():
+                    self._logout()
+                    self.__init__(self.email,settings.total_req[url]["newPassword"])
+            result.update({url:resp})
+        return result
 
+    def apply_settings(self,settings:Settings):
+
+        """Applies the settings to the account.
+        ### Parameters:
+            - settings: The justpaste.Settings object to be passed.
+        """
+        return self._apply_settings(settings)
     def find_by_title(self,string:str):
         """Searches for the specified string in note titles and returns them in {title*:link} format.
         ### Parameters:
@@ -262,7 +287,7 @@ For now only creating new notes trigger captcha.
             - viewonce (bool): State of the note persistence, the note will expire after read once. Default=False
             - tags (list): Tags that will be assigned to the note. Default=[]
             - shared_users (list): If set, only the accounts that are specified will be able to see the note. Default=[] #WIP
-            - expire_date (int): If set, the note will be expired after the timestamp date. Default=None"""
+            - expire_date (yyyy-mm-ddTHH-MM-SSZ format e.g: "2023-03-02T00:00:00Z"): If set, the note will be expired after given date. Default=None"""
 
         return self._new_note(*args,**kwargs)
 
@@ -270,7 +295,6 @@ For now only creating new notes trigger captcha.
 
         """Edits an existing JustPaste.it page (note).
         ### Parameters:
-            - url (str): URL of the page.
             - title (str): Title of the note.
             - body (str): Content of the note in HTML.
             - description (str): Description of the note. (deprecated in the website but still accessible by the API) Default=""
@@ -282,7 +306,7 @@ For now only creating new notes trigger captcha.
             - viewonce (bool): State of the note persistence, the note will expire after read once. Default=False
             - tags (list): Tags that will be assigned to the note. Default=[]
             - shared_users (list): If set, only the accounts that are specified will be able to see the note. Default=[] #WIP
-            - expire_date (int): If set, the note will be expired after the timestamp date. Default=None"""
+            - expire_date (yyyy-mm-ddTHH-MM-SSZ format e.g: "2023-03-02T00:00:00Z"): If set, the note will be expired after given date. Default=None"""
 
         path = url.strip("/")[-5:]
         article_id,secure_code = self._get_attrs(url)
@@ -298,8 +322,8 @@ For now only creating new notes trigger captcha.
     def _logout(self): # idk why this exists but hey 
         r = self.s.post("https://justpaste.it/logout").json()
         if r["success"] == True:
-            return self.s
+            return True
         else:
-            return "could_not_logout"
+            raise Exception("Could not logout")
 
 
