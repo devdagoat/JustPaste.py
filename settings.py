@@ -1,6 +1,5 @@
 import re
 import json
-from .main import Justpaste
 
 class Settings:
     """
@@ -8,7 +7,7 @@ class Settings:
     
     ### Parameters:
         - jp (justpaste.Justpaste): The Justpaste object to be passed. (This is needed for obtaining default values, there are better ways to implement that but oh well)"""
-    def __init__(self,jp:Justpaste):
+    def __init__(self,jp):
         self.jp = jp
 
         if not jp.logged:
