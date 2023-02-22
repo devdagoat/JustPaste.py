@@ -2,7 +2,6 @@ import requests
 import re
 import json
 from bs4 import BeautifulSoup
-from .settings import Settings
 
 
 class Justpaste:
@@ -209,7 +208,7 @@ For now only creating new notes trigger captcha.
                 res.append({note["title"]:note["url"]})
         return res
         
-    def _apply_settings(self,settings:Settings):
+    def _apply_settings(self,settings):
         result = dict()
         for url in settings.total_req:
             if url == "https://justpaste.it/account/settings/public-profile/save":
@@ -224,7 +223,7 @@ For now only creating new notes trigger captcha.
             result.update({url:resp})
         return result
 
-    def apply_settings(self,settings:Settings):
+    def apply_settings(self,settings):
 
         """Applies the settings to the account.
         ### Parameters:
