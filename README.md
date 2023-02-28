@@ -27,15 +27,17 @@ Creating notes with non-premium JustPaste accounts are problematic due to the we
 ## Couple methods as example:
 
 ### Creating a new note:
+```python
     j.new_note(title="Test",body="Demonstration,password="12345") # Every possible parameter is present in the doc-string
 
     >> https://justpaste.it/c5j3o
-
+```
 ### Editing a note*:
+```python
     j.edit_note("https://justpaste.it/c5j3o",title="Edited Title",body="Something that replaces the old text",password="12345") # Every possible parameter is present in the doc-string
 
     >> True
-
+```
 *__Note:__ The new parameters will *overwrite* the old note altogether, please pass the existing parameters if you wish to keep them unchanged.
 
 ### Deleting a note:
