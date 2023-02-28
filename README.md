@@ -15,12 +15,12 @@ Creating notes with non-premium JustPaste accounts are problematic due to the we
 ```pip3 install -U justpaste.py```
 
 ## Usage
-
+```python
     import justpaste
 
     j = justpaste.Justpaste("email_address","password")
     print(j.new_note(title="Test",body="Demonstration,password="12345"))
-
+```
 ### *Output*:
     https://justpaste.it/c5j3o
 
