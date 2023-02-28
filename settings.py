@@ -50,102 +50,99 @@ class Settings:
             else:
                 multipart.update({k:(None,v)})
             return multipart
-    def _change_setting(self,mode:str,pair:dict):
-        match mode: #python version 3.10
-            case "password":
-                url = "https://justpaste.it/account/settings/change-password/save"
-                if "password" in pair:
-                    self.password_req.update({"oldPassword":self.jp.password,"newPassword":pair["password"],"newPasswordRepeat":pair["password"]})
+        
+    def _change_setting(self,mode:str,pair:dict): 
+        if mode == "password":
+            url = "https://justpaste.it/account/settings/change-password/save"
+            if "password" in pair:
+                self.password_req.update({"oldPassword":self.jp.password,"newPassword":pair["password"],"newPasswordRepeat":pair["password"]})
+            else:
+                pass
+            self.total_req.update({url:self.password_req})
+        elif mode == "notes":
+            default = self._get_settings("notes")
+            if "saveSettingsUrl" in default:
+                del default["saveSettingsUrl"]
+            if not any(self.notes_req.values()):
+                self.notes_req = default
+            url = "https://justpaste.it/account/settings/notes/save"
+            for x in self.notes_req:
+                if x in pair:
+                    self.notes_req.update({x:pair[x]})
                 else:
                     pass
-                self.total_req.update({url:self.password_req})
-            case "notes":
-                default = self._get_settings("notes")
-                if "saveSettingsUrl" in default:
-                    del default["saveSettingsUrl"]
-                if not any(self.notes_req.values()):
-                    self.notes_req = default
-                url = "https://justpaste.it/account/settings/notes/save"
-                for x in self.notes_req:
-                    if x in pair:
-                        self.notes_req.update({x:pair[x]})
-                    else:
-                        pass
-                self.total_req.update({url:self.notes_req})
-            case "notification":
-                default = self._get_settings("notification")
-                if "saveSettingsUrl" in default:
-                    del default["saveSettingsUrl"]
-                if not any(self.notification_req.values()):
-                    self.notification_req = default
-                url = "https://justpaste.it/account/settings/notification/save"
-                for x in self.notification_req:
-                    if x in pair:
-                        self.notification_req.update({x:pair[x]})
-                    else:
-                        pass
-                self.total_req.update({url:self.notification_req})
-            case "privacy":
-                default = self._get_settings("privacy")
-                if "saveSettingsUrl" in default:
-                    del default["saveSettingsUrl"]
-                if not any(self.privacy_req.values()):
-                    self.privacy_req = default
-                url = "https://justpaste.it/account/settings/privacy/save"
-                for x in self.privacy_req:
-                    if x in pair:
-                        self.privacy_req.update({x:pair[x]})
-                    else:
-                        pass
-                self.total_req.update({url:self.privacy_req})
-            case "profile":
-                default = self._get_settings("profile")
-                url = "https://justpaste.it/account/settings/public-profile/save"
-                files = {}
-                del default["isPublic"],default["profileLink"],default["avatarUrl"],default["backgroundUrl"]
-                if not any(self.profile_req.values()):
-                    self.profile_req = default
-                if "photo" in pair:
-                    files.update(self._dict_to_multipart_files(pair,file=True))
-                if "background" in pair:
-                    files.update(self._dict_to_multipart_files(pair,file=True))
+            self.total_req.update({url:self.notes_req})
+        elif mode == "notification":
+            default = self._get_settings("notification")
+            if "saveSettingsUrl" in default:
+                del default["saveSettingsUrl"]
+            if not any(self.notification_req.values()):
+                self.notification_req = default
+            url = "https://justpaste.it/account/settings/notification/save"
+            for x in self.notification_req:
+                if x in pair:
+                    self.notification_req.update({x:pair[x]})
                 else:
-                    for x in ["name","permalink","description","location","website"]:
-                        if x in pair:
-                            self.profile_req.update(pair)
-                    if "removeBackground" in pair and pair["removeBackground"] == True:
-                        self.profile_req.update({"removeBackground":True})
-                    else:
-                        self.profile_req.update({"removeBackground":False})
-
-                    files.update(self._dict_to_multipart_files({"form":json.dumps(self.profile_req)}))
-
-                self.files_req.update(files)
-                self.total_req.update({url:self.files_req})
-            case _:
-                pass
+                    pass
+            self.total_req.update({url:self.notification_req})
+        elif mode == "privacy":
+            default = self._get_settings("privacy")
+            if "saveSettingsUrl" in default:
+                del default["saveSettingsUrl"]
+            if not any(self.privacy_req.values()):
+                self.privacy_req = default
+            url = "https://justpaste.it/account/settings/privacy/save"
+            for x in self.privacy_req:
+                if x in pair:
+                    self.privacy_req.update({x:pair[x]})
+                else:
+                    pass
+            self.total_req.update({url:self.privacy_req})
+        elif mode == "profile":
+            default = self._get_settings("profile")
+            url = "https://justpaste.it/account/settings/public-profile/save"
+            files = {}
+            del default["isPublic"],default["profileLink"],default["avatarUrl"],default["backgroundUrl"]
+            if not any(self.profile_req.values()):
+                self.profile_req = default
+            if "photo" in pair:
+                files.update(self._dict_to_multipart_files(pair,file=True))
+            if "background" in pair:
+                files.update(self._dict_to_multipart_files(pair,file=True))
+            else:
+                for x in ["name","permalink","description","location","website"]:
+                    if x in pair:
+                        self.profile_req.update(pair)
+                if "removeBackground" in pair and pair["removeBackground"] == True:
+                    self.profile_req.update({"removeBackground":True})
+                else:
+                    self.profile_req.update({"removeBackground":False})
+                files.update(self._dict_to_multipart_files({"form":json.dumps(self.profile_req)}))
+            self.files_req.update(files)
+            self.total_req.update({url:self.files_req})
+        else:
+            pass
 
     def _get_settings(self,mode:str):
-        match mode:
-            case "profile":
-                profile_regex = re.compile(r"window\.premiumUserData = (.*);")
-                default_values = self.jp._get_json_element(reg=profile_regex,index=5,page="https://justpaste.it/account/settings/public-profile")
-                return default_values
-            case "notes":
-                notes_regex = re.compile(r"window\.notesSettingsPageSettings = (.*);")
-                default_values = self.jp._get_json_element(reg=notes_regex,index=6,page="https://justpaste.it/account/settings/notes")
-                return default_values
-            case "notification":
-                notification_regex = re.compile(r"window\.notificationSettingsPageSettings = (.*);")
-                default_values = self.jp._get_json_element(reg=notification_regex,index=6,page="https://justpaste.it/account/settings/notification")
-                return default_values
-            case "privacy":
-                privacy_regex = re.compile(r"window\.privacySettingsPageSettings = (.*);")
-                default_values = self.jp._get_json_element(reg=privacy_regex,index=6,page="https://justpaste.it/account/settings/privacy")
-                return default_values
-            case _:
-                pass
-
+        if mode == "profile":
+            profile_regex = re.compile(r"window\.premiumUserData = (.*);")
+            default_values = self.jp._get_json_element(reg=profile_regex,index=5,page="https://justpaste.it/account/settings/public-profile")
+            return default_values
+        elif mode == "notes":
+            notes_regex = re.compile(r"window\.notesSettingsPageSettings = (.*);")
+            default_values = self.jp._get_json_element(reg=notes_regex,index=6,page="https://justpaste.it/account/settings/notes")
+            return default_values
+        elif mode == "notification":
+            notification_regex = re.compile(r"window\.notificationSettingsPageSettings = (.*);")
+            default_values = self.jp._get_json_element(reg=notification_regex,index=6,page="https://justpaste.it/account/settings/notification")
+            return default_values
+        elif mode == "privacy":
+            privacy_regex = re.compile(r"window\.privacySettingsPageSettings = (.*);")
+            default_values = self.jp._get_json_element(reg=privacy_regex,index=6,page="https://justpaste.it/account/settings/privacy")
+            return default_values
+        else:
+            pass
+        
     def change(self,key:str,value):
         """
         Changes the given setting (key) with its value (value).
@@ -155,7 +152,7 @@ class Settings:
             - value: The setting value.
         
         ### Possible keys and values:
-            - password* (str): New password for the account.
+            - password* (): New password for the account.
             - photo (tuple(filename,bytes)): Sets new image using the image data. (min. 200x200px, best 400x400px)
             - background (tuple(filename,bytes)): Sets new background image using the image data. (1500x500px)
             - name (str): Sets account display name.
@@ -176,27 +173,27 @@ class Settings:
             - subscribedArticleEmailNotification ("instantly_notify","hourly_notification","daily_notification","weekly_notification","never_notify"): Sets if and when the account owner is notified when there is a new note from subscribed author via email.
         """
         if key == "password":
-            return self._change_setting("password",{key:value})
-        if key in self.notes_req:
-            return self._change_setting("notes",{key:value})
-        if key in self.notification_req:
-            return self._change_setting("notification",{key:value})
-        if key in self.privacy_req:
-            return self._change_setting("privacy",{key:value})
-        if key in ["photo","background","name","permalink","description","location","website","removeBackground"]:
-            return self._change_setting("profile",{key:value})
+            self._change_setting("password",{key:value})
+        elif key in self.notes_req:
+            self._change_setting("notes",{key:value})
+        elif key in self.notification_req:
+            self._change_setting("notification",{key:value})
+        elif key in self.privacy_req:
+            self._change_setting("privacy",{key:value})
+        elif key in ["photo","background","name","permalink","description","location","website","removeBackground"]:
+            self._change_setting("profile",{key:value})
         else:
             raise Exception("Please specify a supported setting")
         
-    def change_bulk(self,list:list):
+    def change_bulk(self,dict:dict):
         """
         Changes the dict keys with dict values inside the given list.
 
         ### Parameters:
-            - list(dict): The list of dicts that contain the key:value to bbe changed.
+            - dict: The dict of key-value pairs that will be changed.
         
         ### Possible keys and values:
-            - password* (str): New password for the account.
+            - password* (): New password for the account.
             - photo (tuple(filename,bytes)): Sets new image using the image data. (min. 200x200px, best 400x400px)
             - background (tuple(filename,bytes)): Sets new background image using the image data. (1500x500px)
             - name (str): Sets account display name.
@@ -216,18 +213,18 @@ class Settings:
             - sharedArticleEmailNotification ("always_notify","only_contacts","never_notify"): Sets if the account owner is notified for new shared notes via email.
             - subscribedArticleEmailNotification ("instantly_notify","hourly_notification","daily_notification","weekly_notification","never_notify"): Sets if and when the account owner is notified when there is a new note from subscribed author via email.
         """
-        for x in list:
-            for key,value in x:
-                if key == "password":
-                    return self._change_setting("password",{key:value})
-                if key in self.notes_req:
-                    return self._change_setting("notes",{key:value})
-                if key in self.notification_req:
-                    return self._change_setting("notification",{key:value})
-                if key in self.privacy_req:
-                    return self._change_setting("privacy",{key:value})
-                if key in ["photo","background","name","permalink","description","location","website","removeBackground"]:
-                    return self._change_setting("profile",{key:value})
-                else:
-                    raise Exception("Please specify a supported setting.")
+
+        for key,value in dict.items():
+            if key == "password":
+                self._change_setting("password",{key:value})
+            elif key in self.notes_req:
+                self._change_setting("notes",{key:value})
+            elif key in self.notification_req:
+                self._change_setting("notification",{key:value})
+            elif key in self.privacy_req:
+                self._change_setting("privacy",{key:value})
+            elif key in ["photo","background","name","permalink","description","location","website","removeBackground"]:
+                self._change_setting("profile",{key:value})
+            else:
+                raise Exception("Please specify a supported setting.")
                     

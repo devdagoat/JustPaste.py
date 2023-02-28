@@ -36,37 +36,69 @@ For now only creating new notes trigger captcha.
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36 OPR/94.0.0.0",
                 "Sec-Ch-Ua": '"Chromium";v="108", "Opera";v="94", "Not)A;Brand";v="99"'}
         payl = {"email":self.email,"password":self.password,"rememberMe":True}
-        r = requests.Session()
-        r.headers.update(headers)
-        f = r.post("https://justpaste.it/api/v1/login",json=payl).json()
+        sess = requests.Session()
+        sess.headers.update(headers)
+        resp = sess.post("https://justpaste.it/api/v1/login",json=payl).json()
         #print(f)
-        if "password" in f:
-            if f["password"] == "invalidPassword":
-                return r,"Invalid password."
-            elif f["password"] == "wrongLengthMin":
-                return r,"Password is too short."
-            elif f["email"] == "userNotFound":
-                return r,"User not found."
+        if "password" in resp:
+            if resp["password"] == "invalidPassword":
+                return sess,"Invalid password."
+            elif resp["password"] == "wrongLengthMin":
+                return sess,"Password is too short."
+            elif resp["email"] == "userNotFound":
+                return sess,"User not found."
             else:
-                return r,"Unknown Error"
-        if "success" in f:
-            if f["success"]:
-                return r
+                return sess,"Unknown Error"
+        if "success" in resp:
+            if resp["success"]:
+                return sess
         else:
-            return r,"Unknown Error"
+            return sess,"Unknown Error"
         
+    def _api_request(self,reqtype:str,uri:str=None,payload=None,field=None,host="https://justpaste.it",files=None):
+        if not uri:
+            dest = host
+        else:
+            if uri.startswith(("https://","http://")):
+                dest = uri
+            else:
+                if not uri.startswith("/"):
+                    uri = "/" + uri
+                dest = host + uri
+        reqtype = reqtype.upper()
+        if type(payload) == dict:
+            if type(files) == bool and files == True:
+                resp = self.s.request(reqtype,dest,files=payload)
+            elif type(files) == dict:
+                resp = self.s.request(reqtype,dest,json=payload,files=files)
+            else:
+                resp = self.s.request(reqtype,dest,json=payload)
+        elif type(payload) == str:
+            resp = self.s.request(reqtype,dest,data=payload)
+        else:
+            resp = self.s.request(reqtype,dest)
+
+        try:
+            resp = resp.json()
+        except json.decoder.JSONDecodeError or requests.exceptions.JSONDecodeError or ValueError:
+            pass
+
+        if field:
+            if field in resp:
+                return resp[field]
+        else:
+            return resp
+
     def _get_attrs(self,url:str):
-        r = self.s.get(url)
-        soup = BeautifulSoup(r.content, 'html.parser')
-        for res in soup.find_all("script"):
-            try:
-                secure_code = re.search('"secureCode":"(.*)","editUrl"',str(res.contents)).group(1)
-            except:
-                continue
-            try:
-                id = re.search('"id":(.*),"secureCode"',str(res.contents)).group(1)
-            except:
-                continue
+        regxid1 = re.compile(r'"id":(.*),"secureCode"')
+        regxid2 = re.compile(r'"id":(.*),"url"')
+        regxsc = re.compile(r'"secureCode":(.*),"editUrl"')
+        secure_code = ""
+        try:
+            id = self._get_json_element(regxid1,1,url)
+            secure_code = self._get_json_element(regxsc,1,url)
+        except:
+            id = self._get_json_element(regxid2,1,url)
         return id,secure_code
 
     def _construct_body(self,
@@ -116,57 +148,57 @@ For now only creating new notes trigger captcha.
         return payl
 
     def _new_note(self,return_attr = False,*args,**kwargs):
-        r1 = self.s.post("https://justpaste.it/api/v1/new-article",data="{}").json()
-        if "status" in r1:
-            if r1["status"] == 429:
-                raise Exception("Rate Limit detected, for now only premium users can use this function.")
-        _sc = r1["article"]["secureCode"]
-        _id = r1["article"]["id"]
+        resp1 = self._api_request("post","/api/v1/new-article","{}","article")
+        _sc = resp1["secureCode"]
+        _id = resp1["id"]
         payl = self._construct_body(_id=_id,_sc=_sc,*args,**kwargs)
         payl["articleId"] = _id
         payl["secureCode"] = _sc
-        r = self.s.post("https://justpaste.it/api/v1/save-article",json=payl).json()
-        if r["action"] == "redirect":
+        resp = self._api_request("post","/api/v1/save-article",payl)
+        if resp["action"] == "redirect":
             if return_attr:
                 return _id,_sc
             else:
-                return "https://justpaste.it" + str(r["url"])
-        elif r["action"] == "captcha":
+                return "https://justpaste.it" + str(resp["url"])
+        elif resp["action"] == "captcha":
             raise Exception("Captcha detected, for now only premium users can use this function.")
 
     def _delete_note(self,_id,_sc):
-        r = self.s.post(f"https://justpaste.it/account/manage/delete/{_id}/{_sc}").json()
-        if r['status'] == "success":
+        result = self._api_request("post",f"/account/manage/delete/{_id}/{_sc}",None,"status")
+        if result == "success":
             return True
         else:
             raise Exception("Could not delete the note. Did you log in with the right account?")
 
     def _edit_note(self,_id,_sc,*args,**kwargs):
         note_properties = {"articleId":_id,"secureCode":_sc}
-        r = self.s.post("https://justpaste.it/api/v1/existing-article",json=note_properties).json()
-        new_id = r["article"]["id"]
-        new_sc = r["article"]["secureCode"]
+        resp = self._api_request("post","/api/v1/existing-article",note_properties,"article")
+        new_id = resp["id"]
+        new_sc = resp["secureCode"]
         new_body = self._construct_body(new_id,new_sc,*args,**kwargs)
-        r2 = self.s.post("https://justpaste.it/api/v1/save-article",json=new_body).json()
-        if "success" in r2:
-            if r2["success"] == True:
-                return True
-            else:
-                raise Exception("Could not edit the note. Did you log in with the right account?")
+        result = self._api_request("post","/api/v1/save-article",new_body,"success")
+        if result == True:
+            return True
         else:
-            print(r2)
+            raise Exception("Could not edit the note. Did you log in with the right account?")
 
-    def _fetch_info(self,info:str=None):
-        resp = self.s.get("https://justpaste.it/")
-        soup = BeautifulSoup(resp.content,"html.parser")
-        raw_info = re.search("window.mainPanelOptions = (.*);",str(soup.find_all("script")[0])).group(1)
-        dict_info = json.loads(raw_info)
+    def _fetch_info(self,info:str=None,profile_url=None,improve_avatar_res=False):
+        if profile_url:
+            regx1 = re.compile(r"window\.pagePremiumUser = (.*);")
+            regx2 = re.compile(r"window\.showPremiumUser = (.*);")
+            dict_info = {}
+            dict_info.update(self._get_json_element(regx1,1,profile_url))
+            dict_info.update(self._get_json_element(regx2,1,profile_url))
+        else:
+            regx = re.compile(r"window\.mainPanelOptions = (.*);")
+            dict_info = self._get_json_element(regx,0,"https://justpaste.it/")
         if info:
             value = str(dict_info[info])
             if value.startswith("/"):
                 if info == "userAvatar":
-                    if value.endswith("/20") or value.endswith("/40"):
-                        return "https://justpaste.it" + value + "0"
+                    if improve_avatar_res:
+                        if value.endswith("/20") or value.endswith("/40"):
+                            return "https://justpaste.it" + value + "0"
                     else: 
                         return "https://justpaste.it" + value
                 else:
@@ -177,29 +209,32 @@ For now only creating new notes trigger captcha.
             return dict_info
 
     def _get_json_element(self,reg,index:int,page=None,page_suffix=''):
-        manage_page = f"https://justpaste.it/account/manage/{page_suffix}"
-        if not page:
-            page = manage_page
-        resp = self.s.get(page)
+        if page_suffix:
+            page = page + page_suffix
+        resp = self._api_request("get",page)
         soup = BeautifulSoup(resp.content,"html.parser")
         scripts = soup.find_all("script")
         script = str(scripts[index])
         result = re.search(reg,script).group(1)
         return json.loads(result)
 
-    def _fetch_notes(self):
+    def _fetch_notes(self,trash=False):
         note_data = re.compile(r"window\.articlesData = (.*);")
         page_num_data = re.compile(r"window\.pagination = (.*);")
+        if trash:
+            page = "https://justpaste.it/account/trash/"
+        else:
+            page = "https://justpaste.it/account/manage/"
         try:
             notes_list = []
-            max_pages = self._get_json_element(page_num_data,5)["totalPages"]
+            max_pages = self._get_json_element(page_num_data,5,page)["totalPages"]
             for i in range(max_pages):
-                notes = self._get_json_element(note_data,5,str(i+1))
+                notes = self._get_json_element(note_data,5,page,page_suffix=str(i+1))
                 for note in notes:
                     notes_list.append(note)
             return notes_list
         except IndexError:
-            print("Couldn't load notes")
+            raise Exception("Couldn't load notes")
 
     def _find_by_title(self,string:str):
         res = []
@@ -207,22 +242,234 @@ For now only creating new notes trigger captcha.
             if string in note["title"]:
                 res.append({note["title"]:note["url"]})
         return res
-        
+    
     def _apply_settings(self,settings):
         result = dict()
         for url in settings.total_req:
             if url == "https://justpaste.it/account/settings/public-profile/save":
                 self.s.headers.update(settings.profile_headers)
-                resp = self.s.post(url,files=settings.files_req)
+                resp = self._api_request("post",url,settings.files_req,files=True)
             else:
                 self.s.headers.update({"Content-Type": "application/json"})
-                resp = self.s.post(url,json=settings.total_req[url])
+                resp = self._api_request("post",url,settings.total_req[url])
                 if url == "https://justpaste.it/account/settings/change-password/save" and "success" in resp.json():
                     self._logout()
                     self.__init__(self.email,settings.total_req[url]["newPassword"])
             result.update({url:resp})
         return result
+    
+    def _get_conv_info(self,url):
+        username = self._fetch_info(profile_url=url)["permalink"]
+        check_payl = {"receiverPermalink":username}
+        return self._api_request("post","/api/v1/conversation/new",check_payl,"conversation",host="https://msg.justpaste.it")
 
+    def _get_note_info(self,url):
+        full_info = {}
+        regx1 = re.compile(r"window\.article = (.*);")
+        regx2 = re.compile(r"window\.barOptions = (.*);")
+        info1 = self._get_json_element(regx1,1,url)
+        info2 = self._get_json_element(regx2,1,url)
+        full_info.update(info1)
+        full_info.update(info2)
+        return full_info
+    
+    def _decide_the_fate_of_note_in_trash(self,action,_id,_sc):
+        resp = self._api_request("post",f"/account/trash/{action}/{_id}/{_sc}")
+        if resp["status"] == "success":
+            if str(resp["id"]) == str(_id):
+                return True
+        else:
+            return resp
+        
+    def _shred_note(self,_id,_sc):
+        return self._decide_the_fate_of_note_in_trash("delete",_id,_sc)
+    
+    def _restore_note(self,_id,_sc):
+        return self._decide_the_fate_of_note_in_trash("restore",_id,_sc)
+
+    def subscribe_to_user(self,url):
+        """
+        Subscribes to user
+        ### Parameters:
+        - url (str): Url of user profile
+        """
+        user_id = self._fetch_info(profile_url=url)["id"]
+        payl = {"premiumUserId":user_id}
+        return self._api_request("post","/api/account/v1/subscribed-user",payl)
+        
+    def unsubscribe_from_user(self,url):
+        """
+        Unsubscribes from user
+        ### Parameters:
+        - url (str): Url of user profile
+        """
+        user_id = self._fetch_info(profile_url=url)["id"]
+        return self._api_request("post",f"/api/account/v1/subscribed-user-delete/{user_id}",None)
+       
+    def add_to_contacts(self,url):
+        """
+        Adds user to contacts
+        ### Parameters:
+        - url (str): Url of user profile
+        """
+        user_id = self._fetch_info(profile_url=url)["id"]
+        payl = {"premiumUserId":user_id}
+        return self._api_request("post","/api/account/v1/contact-user",payl)
+    
+    def remove_from_contacts(self,url):
+        """
+        Removes user from contacts
+        ### Parameters:
+        - url (str): Url of user profile
+        """
+        user_id = self._fetch_info(profile_url=url)["id"]
+        return self._api_request("post",f"/api/account/v1/contact-user-delete/{user_id}",None)
+    
+    def send_msg(self,url,msg):
+        """
+        Sends message to user*
+        ### Parameters:
+        - url (str): Url of user profile
+        - msg (str): The message that will be sent
+
+        #### Important:
+        The user needs to be in contacts in order for messages to show up in website.
+        """
+        username = self._fetch_info(profile_url=url)["permalink"]
+        payl = {"receiverPermalink":username,"message":msg}
+        return self._api_request("post","/api/v1/message/send",payl,"success",host="https://msg.justpaste.it")
+        
+    def check_msgs(self,url,before=None,after=None):
+        """
+        Checks for new messages
+        ### Parameters:
+        - url (str): Url of user profile
+        - before (time in format yyyy-mm-ddTHH-MM-SS.fff+zz e.g: 2023-02-26T04:26:04.000+03:00): Fetch for messages sent before this date Default: None 
+        - after (time in format yyyy-mm-ddTHH-MM-SS.fff+zz e.g: 2023-02-26T04:26:04.000+03:00): Fetch for messages sent after this date Default: None 
+        """
+        conv_id = self._get_conv_info(url)["id"]
+        payl = {"beforeDateTime":before,"afterDateTime":after}
+        return self._api_request("post",f"/api/v1/conversation/{conv_id}/message",payl,"messages",host="https://msg.justpaste.it")
+        
+    def get_user_info(self,url):
+        """
+        Returns info about given user
+
+        ### Parameters:
+            - url (str): The url of profile
+        """
+        return self._fetch_info(profile_url=url)
+
+    def mute_conv(self,url):
+        """
+        Mutes conversation
+        ### Parameters:
+        - url (str): Url of user profile
+        """
+        conv_id = self._get_conv_info(url)["id"]
+        payl = {"muted":True}
+        return self._api_request("post",f"/api/v1/conversation/{conv_id}/mute",payl,host="https://msg.justpaste.it")
+    
+    def unmute_conv(self,url):
+        """
+        Unmutes conversation
+        ### Parameters:
+        - url (str): Url of user profile
+        """
+        conv_id = self._get_conv_info(url)["id"]
+        payl = {"muted":False}
+        return self._api_request("post",f"/api/v1/conversation/{conv_id}/mute",payl,host="https://msg.justpaste.it")
+    
+    def star_conv(self,url):
+        """
+        Adds star to conversation
+        ### Parameters:
+        - url (str): Url of user profile
+        - star (bool): State of the star 
+        """
+        conv_id = self._get_conv_info(url)["id"]
+        payl = {"star":True}
+        return self._api_request("post",f"/api/v1/conversation/{conv_id}/star",payl,host="https://msg.justpaste.it")
+    
+    def unstar_conv(self,url):
+        """
+        Removes star from conversation
+        ### Parameters:
+        - url (str): Url of user profile
+        - star (bool): State of the star 
+        """
+        conv_id = self._get_conv_info(url)["id"]
+        payl = {"star":False}
+        return self._api_request("post",f"/api/v1/conversation/{conv_id}/star",payl,host="https://msg.justpaste.it")
+
+    def list_msgs(self):
+        """
+        Lists all conversations
+        """
+        return self._api_request("post","/api/v1/conversation/list",{},"conversations",host="https://msg.justpaste.it")
+
+    def fav_note(self,url):
+        """
+        Adds note to favorites
+        ### Parameters:
+        - url (str): Url of note
+        """
+        article_id = self._get_attrs(url)[0]
+        payl = {"articleId":int(article_id)}
+        return self._api_request("post","/api/account/v1/favourite-article",payl)
+    
+    def unfav_note(self,url):
+        """
+        Removes note from favorites
+        ### Parameters:
+        - url (str): Url of note
+        """
+        article_id = self._get_attrs(url)[0]
+        return self._api_request("post",f"/api/account/v1/favourite-article-delete/{article_id}",None)
+    
+    def get_subscribed_notes(self):
+        """
+        Returns notes from subscribed users.
+        """
+        regx = re.compile(r"window\.publicArticlesData = (.*);")
+        return self._get_json_element(regx,5,"https://justpaste.it/account/subscribed")
+    
+    def get_total_stats(self):
+        """
+        Returns total stats for profile.
+        """
+        regx = re.compile(r"window\.articlesStatsData = (.*);")
+        return self._get_json_element(regx,5,"https://justpaste.it/account/articles-stats")
+
+    def get_note_info(self,url):
+        """
+        Returns info about the given note
+        
+        ### Parameters:
+            - url (str): The url of note"""
+        return self._get_note_info(url)
+
+    def shred_note(self,url):
+        """
+        Permanently deletes the note in trash.
+
+        ### Parameters:
+            - url (str): The url of note
+        """
+
+        article_id,secure_code = self._get_attrs(url)
+        return self._shred_note(article_id,secure_code)
+    
+    def restore_note(self,url):
+        """
+        Restores the note in trash.
+
+        ### Parameters:
+            - url (str): The url of note
+        """
+
+        article_id,secure_code = self._get_attrs(url)
+        return self._restore_note(article_id,secure_code)
     def apply_settings(self,settings):
 
         """Applies the settings to the account.
@@ -239,18 +486,18 @@ For now only creating new notes trigger captcha.
         
         return self._find_by_title(string)
 
-    def fetch_notes(self,verbose = False):
-        """Returns the notes that aren't in the trash in the format of {title*:link} format.**
+    def fetch_notes(self,trash = False,verbose = False):
+        """Returns the notes in the format of {title*:link} format.**
         ### Parameters:
             - verbose (bool): If set to True, everything (Article ID, Secure code, creation date etc.) about the note is returned instead. Default=False
-
+            - trash (bool): If set to True, returns notes from trash instead.
         *If a link does not have a title, first ~60 characters of the body is passed instead. (This is a result of the website API.)"""
-
+        
         if verbose:
-            return self._fetch_notes()
+            return self._fetch_notes(trash)
         else:
             notes_list = []
-            for note in self._fetch_notes():
+            for note in self._fetch_notes(trash):
                 notes_list.append({note["title"]:note["url"]})
             return notes_list
 
@@ -318,9 +565,9 @@ For now only creating new notes trigger captcha.
         article_id,secure_code = self._get_attrs(url)
         return self._delete_note(_id=article_id,_sc=secure_code,*args,**kwargs)
 
-    def _logout(self): # idk why this exists but hey 
-        r = self.s.post("https://justpaste.it/logout").json()
-        if r["success"] == True:
+    def _logout(self):
+        result = self._api_request("post","/logout",None,"success")
+        if result == True:
             return True
         else:
             raise Exception("Could not logout")

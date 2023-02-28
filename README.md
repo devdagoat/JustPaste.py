@@ -24,7 +24,7 @@ Creating notes with non-premium JustPaste accounts are problematic due to the we
 ### *Output*:
     https://justpaste.it/c5j3o
 
-## Methods
+## Couple methods as example:
 
 ### Creating a new note:
     j.new_note(title="Test",body="Demonstration,password="12345") # Every possible parameter is present in the doc-string
@@ -39,9 +39,14 @@ Creating notes with non-premium JustPaste accounts are problematic due to the we
 *__Note:__ The new parameters will *overwrite* the old note altogether, please pass the existing parameters if you wish to keep them unchanged.
 
 ### Deleting a note:
-    j.delete_note(https://justpaste.it/c5j3o)
+    j.delete_note("https://justpaste.it/c5j3o")
 
     >> True
+
+### Restoring note from trash:
+    j.restore_note("https://justpaste.it/c5j3o")
+
+    >> {"status":"success"}
 
 ### Getting account info:
     j.fetch_info("userEmail")
@@ -57,6 +62,15 @@ Creating notes with non-premium JustPaste accounts are problematic due to the we
 
     >> list(dict(...))
 
+### Fetching all notes from trash**:
+    j.fetch_notes(trash=True)
+
+    >> list({title*:url})
+
+    j.fetch_notes(trash=True,verbose=True)
+
+    >> list(dict(...))
+
 ### Finding a note by title**:
     j.find_by_title("string")
 
@@ -64,9 +78,46 @@ Creating notes with non-premium JustPaste accounts are problematic due to the we
 
 **__Note:__ If a note has no title, its first ~60 characters of body is returned as title instead. (The reason is the API returns it as title.)
 
+### Sending message to user:
+    j.send_msg("https://justpaste.it/u/Justpaste","Hello")
+
+    >> True
+
+### Checking messages from user:
+    j.check_msgs("https://justpaste.it/u/Justpaste")
+
+    >> dict()
+
+### Getting user information:
+    j.get_user_info("https://justpaste.it/u/Justpaste")
+
+    >> dict()
+
+### Muting conversation:
+    j.mute_conv("https://justpaste.it/u/Justpaste")
+
+    >> {'muted': True}
+
+### Unmuting conversation:
+    j.unmute_conv("https://justpaste.it/u/Justpaste")
+
+    >> {'muted': False}
+
+### Subscribing to user:
+    j.subscribe_to_user("https://justpaste.it/u/Justpaste")
+
+    >> {'isSubscribed': True}
+
+### Adding note to favorites:
+    j.fav_note("https://justpaste.it/c5j3o")
+
+    >> {'isFavouirte': True}
+
+*Check the code yourself to see more methods*
+
 ## Settings
 
-Now there is a way to change the account settings via this API. It is done via the justpaste.Settings class.
+Now there is a way to change the account settings with this library. It is done by the justpaste.Settings class.
 
     settings = justpaste.Settings(j)
     
