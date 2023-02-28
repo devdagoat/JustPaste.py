@@ -152,7 +152,7 @@ class Settings:
             - value: The setting value.
         
         ### Possible keys and values:
-            - password* (): New password for the account.
+            - password* (str): New password for the account.
             - photo (tuple(filename,bytes)): Sets new image using the image data. (min. 200x200px, best 400x400px)
             - background (tuple(filename,bytes)): Sets new background image using the image data. (1500x500px)
             - name (str): Sets account display name.
