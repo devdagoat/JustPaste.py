@@ -41,6 +41,6 @@ jp.delete_article(edited)
 
 user = user_from_url("...")
 user.public_articles # previews
-[*load_articles_from_preview(preview) for preview in user.public_articles] # full articles
+[load_articles_from_preview(preview) for preview in user.public_articles] # full articles
 
 ```
