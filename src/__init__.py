@@ -14,7 +14,27 @@ class Justpaste(
     MessagesMixin
     ):
     
+    """
+    ## Justpaste Class
+
+    """
+
     def __init__(self, email: str | None = None, password: str | None = None, proxy: str | None = None):
+
+
+        """
+        Initialize a Justpaste instance.
+        ### Args:
+            - email (str | None): Email of account. Default: None
+            - password (str | None): Password of account. Default: None
+            - proxy (str | None): Proxy URL ("http://user:password@ip:port") Default: None
+
+        #### Important: 
+        *JustPaste.it API will trigger captchas only for making \
+        new articles if the account never had premium. \
+        The captcha will not be triggered even if the premium runs out.*
+
+        """
 
         if proxy:
             session = requests.Session()

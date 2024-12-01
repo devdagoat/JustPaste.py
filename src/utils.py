@@ -11,17 +11,35 @@ from .objects import *
 from .consts import *
 from .exceptions import RequireDynamicLoading
 
-from typing import Any, Generator, Iterable, TypeVar
+from typing import Any, Generator, Iterable, TypeVar, Unpack
 from bs4 import NavigableString, Tag
 
-_T = TypeVar('_T')
+T = TypeVar('T')
 
-def without_key(d:dict[_T, Any], *ks:_T) -> dict:
+def without_key(d:dict[T, Any], *ks:T) -> dict:
     d_copy = {}
     for k, v in d.items():
         if k not in ks:
             d_copy[k] = v
     return d_copy
+
+def delta_to_datetime(deltastr:str) -> datetime.datetime:
+    # 32s, 10h, 15m etc to absolute datetime
+    current = datetime.datetime.now()
+    value, unit, _ = deltastr.partition(deltastr[-1])
+    value = int(value)
+
+    match unit:
+        case 'h':
+            delta = datetime.timedelta(hours=value)
+        case 'm':
+            delta = datetime.timedelta(minutes=value)
+        case 's':
+            delta = datetime.timedelta(seconds=value)
+        case _:
+            raise NotImplementedError(f"Can't parse {deltastr}")
+
+    return current - delta
 
 def camel_case_to_snake_case(string:str) -> str:
     matches : list[str] = CAMEL_TO_SNAKE_REGEX.findall(string)
@@ -171,13 +189,25 @@ class ModelInitializer:
                     v = int(v.replace(',', ''))
                 case 'created':
                     k = 'createdAt'
-                    # Jun 7, 2022
-                    month, day, year = v.split(' ')
-                    day = day.strip(',')
-                    if len(day) == 1:
-                        day = '0'+day
-                    # Jun 07 2022
-                    v = datetime.datetime.strptime(f"{month} {day} {year}", '%b %d %Y')
+                    if v.count(' ') == 0:
+                        # 5h, 32m, 10s etc
+                        v = delta_to_datetime(v)
+                    else:
+                        if v.count(' ') == 1:
+                            # Jun 7
+                            month, day = v.split(' ')
+                            year = datetime.datetime.now().year
+                        elif v.count(' ') == 2:
+                            # Jun 7, 2022
+                            month, day, year = v.split(' ')
+                            day = day.strip(',')
+                        else:
+                            raise NotImplementedError(f"Cannot parse {v}")
+
+                        if len(day) == 1:
+                            day = '0'+day
+                        # Jun 07 2022
+                        v = datetime.datetime.strptime(f"{month} {day} {year}", '%b %d %Y')
                 case 'positive' | 'negative':
                     k += 'Votes'
             cleaned[camel_case_to_snake_case(k)] = v
@@ -286,10 +316,15 @@ def extract_article(url:str | HttpUrl, page_source:str, dynamic_content:str|None
 
     return ModelInitializer.article(raw)
 
-def extract_public_articles(*page_sources:str) -> Generator[PublicArticlePreview, None, None]:
+def extract_public_article_previews(*page_sources:str) -> Generator[PublicArticlePreview, None, None]:
     for page_source in page_sources:
         for article_raw in json.loads(scrape_from_script_tags(RegexPatterns.PUBLIC_ARTICLES_DATA.value, page_source, 1).group(1)):
             yield ModelInitializer.public_article_preview(article_raw)
+
+def extract_article_previews(*page_sources:str) -> Generator[ArticlePreview, None, None]:
+    for page_source in page_sources:
+        for article_raw in json.loads(scrape_from_script_tags(RegexPatterns.ARTICLES_DATA.value, page_source, 1).group(1)):
+            yield ModelInitializer.article_preview(article_raw)
 
 def extract_user(page_source:str, public_articles:list[PublicArticlePreview]) -> User:
     raw = {'public_articles':public_articles, **extract_user_metadata(page_source)}

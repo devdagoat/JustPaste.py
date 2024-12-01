@@ -55,21 +55,19 @@ class JustpasteBase:
             
             return sess
 
-    def article_from_url(self, url:str) -> Article | OwnArticle:
-        resp = self.session.get(url)
-        check_response(resp, ArticleError, f"Error while getting article")
-        try:
-            return extract_article(url, resp.text)
-        except RequireDynamicLoading as e:
-            return extract_article(url, resp.text, self._load_content_dynamic(e.article_id))
-
     def _load_content_dynamic(self, article_id:int) -> str:
         resp = self.session.post(APIEndpoints.ARTICLE_DYNAMIC.value, json={'articleId':article_id})
         check_response(resp, APIError, "Error while getting dynamic content", (lambda r: r.ok, lambda r: r.json().get('action', None) == 'display'))
 
         return resp.json()['articleContent']
 
-    def _paginate_raw(self, start_url:str, page_buffer:int=1, first_page_source:str|None=None, total_pages:int|None=None):
+    def _paginate_raw(self, 
+                      start_url:str, 
+                      parser:Callable[[Unpack[tuple[str, ...]]], Generator[T]], 
+                      page_buffer:int=1, 
+                      first_page_source:str|None=None, 
+                      total_pages:int|None=None):
+        
         if first_page_source is not None:
             first_page = first_page_source
         else:
@@ -89,7 +87,7 @@ class JustpasteBase:
             for prep in (pbar := tqdm(prepared_requests, desc="Getting pages", unit='page', leave=False)):
 
                 if buf_counter % page_buffer == 0:
-                    yield from extract_public_articles(*buffer_pages)
+                    yield from parser(*buffer_pages)
                     buffer_pages.clear()
 
                 resp = self.session.send(prep, verify=False)
@@ -98,10 +96,10 @@ class JustpasteBase:
                 buf_counter += 1
 
             if len(buffer_pages) > 0:
-                yield from extract_public_articles(*buffer_pages)
+                yield from parser(*buffer_pages)
         
         elif total == 1:
-            yield from extract_public_articles(first_page)
+            yield from parser(first_page)
 
     def _new_article(self, **kwargs) -> OwnArticle:
         new_article_resp = self.session.post(APIEndpoints.NEW_ARTICLE.value, json={})
@@ -158,7 +156,44 @@ class JustpasteBase:
 
         return self.article_from_url(ROOT+resp.json()['url'])
 
-    def get_user_article_previews(self, user_profile_url:str, page_buffer:int=1, first_page_source:str|None=None):
+    def article_from_url(self, url:str) -> Article | OwnArticle:
+        """
+        Get Article data from URL.
+        
+        Args:
+            url: URL of article
+
+        Returns:
+            Article object. Article or OwnArticle depending on whoever created the article.
+
+        Raises:
+            ArticleError: Failed to get the article.
+        """
+        resp = self.session.get(url)
+        check_response(resp, ArticleError, f"Error while getting article")
+        try:
+            return extract_article(url, resp.text)
+        except RequireDynamicLoading as e:
+            return extract_article(url, resp.text, self._load_content_dynamic(e.article_id))
+
+    def get_public_article_previews(self, user:User, pages:int|None=None, page_buffer:int=1, first_page_source:str|None=None):
+        """
+        Get Public Profile Article Previews
+
+        Args:
+            user: Target user to get article previews of
+            pages: No. of pages to scrape. Default: None (All pages)
+            page_buffer: No. of pages to buffer before yielding. Default: 1
+            first_page_source: Raw HTML of user profile. Default: None
+        
+        Yields:
+            PublicArticlePreview
+
+        Raises:
+            APIError: Failed to get all pages
+
+        """
+        user_profile_url = str(user.url)
         if first_page_source is not None:
             first_page = first_page_source
         else:
@@ -166,11 +201,32 @@ class JustpasteBase:
             check_response(resp, APIError, "Error while getting user profile URL: "+ user_profile_url)
             first_page = resp.text
 
-        total_pages = json.loads(scrape_from_script_tags(RegexPatterns.PAGINATION.value, first_page, 1).group(1))['totalPages']
+        total_pages : int = json.loads(scrape_from_script_tags(RegexPatterns.PAGINATION.value, first_page, 1).group(1))['totalPages']
+        if pages is None or pages > total_pages:
+            pages = total_pages
+            
 
-        return self._paginate_raw(user_profile_url, page_buffer, first_page, total_pages)
+        return self._paginate_raw(user_profile_url, extract_public_article_previews, page_buffer, first_page, pages)
 
-    def get_own_article_previews(self, trash=False, page_buffer:int=1, first_page_source:str|None=None):
+    def get_own_article_previews(self, trash=False, pages:int|None=None, page_buffer:int=1, first_page_source:str|None=None):
+
+        """
+        Get Own Article previews
+
+        Args:
+            trash: Get the trashed notes instead of active ones. Default: False
+            pages: No. of pages to scrape. Default: None (All pages)
+            page_buffer: No. of pages to buffer before yielding. Default: 1
+            first_page_source: Raw HTML of user profile. Default: None
+        
+        Yields:
+            PublicArticlePreview
+
+        Raises:
+            APIError: Failed to get all pages
+
+        """
+
         if trash:
             url = APIEndpoints.TRASH.value
         else:
@@ -184,21 +240,49 @@ class JustpasteBase:
             first_page = resp.text
 
         total_pages = json.loads(scrape_from_script_tags(RegexPatterns.PAGINATION.value, first_page, 5).group(1))['totalPages']
+        if pages is None or pages > total_pages:
+            pages = total_pages
 
-        return self._paginate_raw(url, page_buffer, first_page, total_pages)
+        return self._paginate_raw(url, extract_article_previews, page_buffer, first_page, pages)
 
     def load_article_from_preview(self, preview:PublicArticlePreview | ArticlePreview) -> Article | OwnArticle:
+
+        """
+        Load article from its preview
+
+        Args:
+            preview: Any article preview 
+        
+        Returns:
+            Full article
+        """
+
         return self.article_from_url(str(preview.url))
 
-    def fetch_user(self, user_profile_url:str) -> User:
+    def user_from_url(self, user_profile_url:str, load_article_previews=True) -> User:
+
+        """
+        Load user from URL.
+
+        Args:
+            user_profile_url: URL of user profile
+            load_article_previews: Load article previews into the object. Default=True
+        
+        Returns:
+            User object
+
+        """
+
         resp = self.session.get(user_profile_url)
         check_response(resp, APIError, "Error while getting user profile URL: "+ user_profile_url)
         profile_page = resp.text
-
-        public_articles = [*self.get_user_article_previews(user_profile_url, 3, profile_page)]
+        user = extract_user(profile_page, [])
         
-        return extract_user(profile_page, public_articles)
-
+        if load_article_previews:
+            public_articles = [*self.get_public_article_previews(user, None, 3, profile_page)]
+            user.public_articles = public_articles
+        
+        return user
         
     def shred_article(self, article:OwnArticle):
         
@@ -263,7 +347,7 @@ class JustpasteBase:
         resp = self.session.get(APIEndpoints.SUBSCRIBED.value)
         check_response(resp, APIError, "Error while getting subscribed accounts")
 
-        return [*extract_public_articles(resp.text)]
+        return [*extract_public_article_previews(resp.text)]
     
     def get_total_stats(self):
         """
@@ -278,21 +362,21 @@ class JustpasteBase:
     def new_article(self, **kwargs):
 
         """Creates a new JustPaste.it page (article).
-        ### Parameters:
-            - title (str): Title of the article.
-            - body (str): Content of the article in HTML.
-            - description (str): Description of the article. (deprecated in the website but still accessible by the API) Default=""
-            - privacy ("public","hidden","private"): Visibility level of the article. Default="hidden" if logged, else "public"
-            - password (str): Password of the article. Default=None
-            - require_captcha (bool): State of the captcha status, Captcha will be needed before viewing if set to True. Default=False
-            - hide_views (bool): State of the views counter, the counter will be hidden if set to True. Default=False
-            - anon_owner (bool): State of the profile link, the article will look anonymous if set to True. Default=False
-            - viewonce (bool): State of the article persistence, the article will expire after read once. Default=False
-            - tags (list): Tags that will be assigned to the article. Default=[]
-            - shared_users (list): If set, only the accounts that are specified will be able to see the article. Default=[] 
-            - expiry_date (yyyy-mm-ddTHH-MM-SSZ format e.g: "2023-03-02T00:00:00Z"): If set, the article will be expired after given date. Default=None
+        Parameters:
+            title (str): Title of the article.
+            body (str): Content of the article in HTML.
+            description (str): Description of the article. (deprecated in the website but still accessible by the API) Default=""
+            privacy ("public","hidden","private"): Visibility level of the article. Default="hidden" if logged, else "public"
+            password (str): Password of the article. Default=None (Premium Only)
+            require_captcha (bool): State of the captcha status, Captcha will be needed before viewing if set to True. Default=False
+            hide_views (bool): State of the views counter, the counter will be hidden if set to True. Default=False
+            anon_owner (bool): State of the profile link, the article will look anonymous if set to True. Default=False
+            viewonce (bool): State of the article persistence, the article will expire after read once. Default=False
+            tags (list): Tags that will be assigned to the article. Default=[]
+            shared_users (list): If set, only the accounts that are specified will be able to see the article. Default=[] 
+            expiry_date (yyyy-mm-ddTHH-MM-SSZ format e.g: "2023-03-02T00:00:00Z"): If set, the article will be expired after given date. Default=None
         ### Returns: 
-            (OwnArticle)
+            OwnArticle
         """
 
         if isinstance(kwargs.get('expiry_date', None), datetime.datetime):
