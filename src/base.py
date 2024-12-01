@@ -63,7 +63,7 @@ class JustpasteBase:
 
     def _paginate_raw(self, 
                       start_url:str, 
-                      parser:Callable[[Unpack[tuple[str, ...]]], Generator[T]], 
+                      parser:Callable[[Unpack[tuple[str, ...]]], Generator[T, None, None]], 
                       page_buffer:int=1, 
                       first_page_source:str|None=None, 
                       total_pages:int|None=None):
@@ -400,7 +400,7 @@ class JustpasteBase:
             - viewonce (bool): State of the article persistence, the article will expire after read once. Default=False
             - tags (list): Tags that will be assigned to the article. Default=[]
             - shared_users (list): If set, only the accounts that are specified will be able to see the article. Default=[] 
-            - expire_date (yyyy-mm-ddTHH-MM-SSZ format e.g: "2023-03-02T00:00:00Z"): If set, the article will be expired after given date. Default=None"""
+            - expiry_date (yyyy-mm-ddTHH-MM-SSZ format e.g: "2023-03-02T00:00:00Z"): If set, the article will be expired after given date. Default=None"""
 
         return self._edit_article(article, **kwargs)
 
