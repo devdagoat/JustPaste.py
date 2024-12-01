@@ -21,3 +21,6 @@ classifiers = [
 
 [project.urls]
 "Homepage" = "https://github.com/devdagoat/JustPaste.py"
+
+[tool.setuptools.packages.find]
+where = ["src"]
