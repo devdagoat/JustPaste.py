@@ -88,19 +88,19 @@ class TestJustpaste(unittest.TestCase):
 
     def test_get_messages(self):
         """Test getting messages."""
-        user = justpaste.fetch_user(TESTERS["other_user_url"])
+        user = justpaste.user_from_url(TESTERS["other_user_url"])
         msgs = justpaste.get_messages(user)
         assert len(msgs) > 0
 
 
     def test_get_conversation(self):
         """Test getting conversation."""
-        conv = justpaste.get_conversation(justpaste.fetch_user(TESTERS["other_user_url"]))
+        conv = justpaste.get_conversation(justpaste.user_from_url(TESTERS["other_user_url"]))
         assert isinstance(conv, Conversation)
 
     def test_send_message(self):
         """Test sending a message."""
-        user = justpaste.fetch_user(TESTERS["other_user_url"])
+        user = justpaste.user_from_url(TESTERS["other_user_url"])
         conv1 = justpaste.get_messages(user)
         msg = justpaste.send_message(user, "Testing")
         conv2 = justpaste.get_messages(user)
@@ -110,7 +110,7 @@ class TestJustpaste(unittest.TestCase):
 
     def test_mute_conversation(self):
         """Test muting a conversation."""
-        user = justpaste.fetch_user(TESTERS["other_user_url"])
+        user = justpaste.user_from_url(TESTERS["other_user_url"])
         conv = justpaste.get_conversation_info(user)
         justpaste.mute_conversation(conv)
 
@@ -119,7 +119,7 @@ class TestJustpaste(unittest.TestCase):
 
     def test_unmute_conversation(self):
         """Test unmuting a conversation."""
-        user = justpaste.fetch_user(TESTERS["other_user_url"])
+        user = justpaste.user_from_url(TESTERS["other_user_url"])
         conv = justpaste.get_conversation_info(user)
         justpaste.unmute_conversation(conv)
 
@@ -128,7 +128,7 @@ class TestJustpaste(unittest.TestCase):
 
     def test_star_conversation(self):
         """Test starring a conversation."""
-        user = justpaste.fetch_user(TESTERS["other_user_url"])
+        user = justpaste.user_from_url(TESTERS["other_user_url"])
         conv = justpaste.get_conversation_info(user)
         justpaste.star_conversation(conv)
 
@@ -137,7 +137,7 @@ class TestJustpaste(unittest.TestCase):
 
     def test_unstar_conversation(self):
         """Test unstarring a conversation."""
-        user = justpaste.fetch_user(TESTERS["other_user_url"])
+        user = justpaste.user_from_url(TESTERS["other_user_url"])
         conv = justpaste.get_conversation_info(user)
         justpaste.unstar_conversation(conv)
 
@@ -148,18 +148,18 @@ class TestJustpaste(unittest.TestCase):
 
     def test_add_to_contacts(self):
         """Test adding a user to contacts."""
-        user = justpaste.fetch_user(TESTERS["other_user_url"])
+        user = justpaste.user_from_url(TESTERS["other_user_url"])
         justpaste.add_to_contacts(user)
 
     def test_remove_from_contacts(self):
         """Test removing a user from contacts."""
-        user = justpaste.fetch_user(TESTERS["other_user_url"])
+        user = justpaste.user_from_url(TESTERS["other_user_url"])
         justpaste.remove_from_contacts(user)
 
     def test_change_password(self):
         """Test password change functionality."""
 
-        user = justpaste.fetch_user(TESTERS["other_user_url"])
+        user = justpaste.user_from_url(TESTERS["other_user_url"])
 
         justpaste.change_password(TESTERS["new_password"])
         self.assertEqual(justpaste.password, TESTERS["new_password"])
@@ -196,12 +196,12 @@ class TestJustpaste(unittest.TestCase):
         """Test Justpaste initialization without proxy."""
 
         justpaste_tester = Justpaste(EMAIL, PASSWORD)
-        assert isinstance(justpaste_tester.fetch_user(TESTERS["other_user_url"]), User)
+        assert isinstance(justpaste_tester.user_from_url(TESTERS["other_user_url"]), User)
 
     def test_initialization_with_proxy(self):
         """Test Justpaste initialization with proxy."""
         justpaste_tester = Justpaste(EMAIL, PASSWORD, TESTERS["proxy"])
-        assert isinstance(justpaste_tester.fetch_user(TESTERS["other_user_url"]), User)
+        assert isinstance(justpaste_tester.user_from_url(TESTERS["other_user_url"]), User)
 
 
 
