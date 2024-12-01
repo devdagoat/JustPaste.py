@@ -1,6 +1,6 @@
-from src import Justpaste
-from src.exceptions import *
-from src.objects import *
+from src.justpaste import Justpaste
+from src.justpaste.exceptions import *
+from src.justpaste.objects import *
 
 import unittest
 
