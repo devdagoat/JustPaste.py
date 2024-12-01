@@ -44,7 +44,7 @@ class MessagesMixin(JustpasteSessionProto):
                        "Error while getting conversations list",
                        (lambda r: r.ok, lambda r: 'conversations' in r.json()))
         
-        return [ModelInitializer.conversation(c, self.fetch_user(c['interlocutor']['url'])) for c in resp.json()['conversations']]
+        return [ModelInitializer.conversation(c, self.user_from_url(c['interlocutor']['url'])) for c in resp.json()['conversations']]
 
     def send_message(self, user:User, message:str):
 

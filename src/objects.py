@@ -8,19 +8,17 @@ from requests import Session
 
 from .consts import *
 
-if TYPE_CHECKING:
-    from .base import JustpasteBase
-
 sentinel = object()
 
-class JustpasteSessionProto(Protocol):
-    session : Session
-    email : str
-    password : str
+class JustpasteSessionProto:
+    if TYPE_CHECKING:
+        session : Session
+        email : str
+        password : str
 
-    def fetch_user(self, user_profile_url:str) -> "User": ...
-    def __init__(self, email:str|None=None, password:str|None=None): ...
-    def logout(self) -> None: ...
+        def user_from_url(self, user_profile_url:str) -> "User": ...
+        def __init__(self, email:str|None=None, password:str|None=None): ...
+        def logout(self) -> None: ...
 
 class SaveArticleData(BaseModel):
     articleId : int
