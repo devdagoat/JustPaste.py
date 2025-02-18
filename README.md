@@ -39,7 +39,7 @@ jp.delete_article(edited)
 
 # get a user's public articles
 
-user = user_from_url("...")
+user = jp.user_from_url("...")
 user.public_articles # previews
 [load_articles_from_preview(preview) for preview in user.public_articles] # full articles
 
